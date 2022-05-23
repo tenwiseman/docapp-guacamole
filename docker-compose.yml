@@ -1,0 +1,22 @@
+version: '3'
+
+services:
+  nginx-proxy:
+    image: jwilder/nginx-proxy:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./data/guacamole/certs:/etc/nginx/certs
+
+networks:
+  default:
+    name: docker_default
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.68.5.0/24 
+
+
+

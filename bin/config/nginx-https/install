@@ -1,0 +1,115 @@
+#!/bin/bash
+colour_cyan='\033[0;36m'
+colour_yelw='\033[1;33m'
+colour_none='\033[0m' # No Colour
+
+# Change this hostname as appropiate.
+DOCAPP_HOSTNAME=guacamole.custom-site.com
+
+certs_dir=$DOCAPP_HOME/data/guacamole/certs
+host=$certs_dir/$DOCAPP_HOSTNAME
+
+scratch_dir=$DOCAPP_HOME/data/guacamole/scratch/nginx-https
+
+echo -e "$colour_yelw
+* Checking Nginx HTTPS Installation
+$colour_none"
+
+if [ ! -d "$DOCAPP_HOME" ];then
+   echo "? docapp home ($DOCAPP_HOME) missing?"
+   echo "! stopping configuration"
+   exit 
+fi
+
+
+cd $DOCAPP_HOME
+
+if [ "$1" == "clean" ];then
+
+  if [ -d "$certs_dir" ];then 
+    cd $certs_dir
+    rm -f $host.key $host.crt
+    rmdir ../certs && echo "* cleaned certs"
+  fi
+
+  exit
+fi
+    
+
+mkdir -p $certs_dir
+
+
+if [ ! -f "$host.crt" -o ! -f "$host.key" -o "$1" == "replace" ];then 
+
+   echo -e "$colour_cyan
+* Creating HTTPS certificate
+* Press the enter key to accept following defaults shown
+$colour_none"
+
+   mkdir -p $scratch_dir
+   cd $scratch_dir
+
+   # backup previous to scratch
+   cp $host.key $host.crt . 2>/dev/null
+
+cat << EOF > ssl.conf 
+[ req ]
+default_bits       = 2048
+default_keyfile = privkey.pem 
+distinguished_name = req_distinguished_name
+req_extensions     = v3_req
+x509_extensions    = v3_ca
+
+[ req_distinguished_name ]
+countryName                 = Country Name (2 letter code)
+countryName_default         = GB
+stateOrProvinceName         = State or Province Name (full name)
+stateOrProvinceName_default = England
+localityName                = Locality Name (eg, city)
+localityName_default        = London 
+organizationName            = Organization Name (eg, company)
+organizationName_default    = Private 
+commonName                  = Common Name (e.g. server FQDN or YOUR name)
+commonName_max              = 64
+commonName_default          = $DOCAPP_HOSTNAME 
+
+[ v3_req ]
+basicConstraints = CA:FALSE
+keyUsage = digitalSignature, nonRepudiation, keyEncipherment
+
+[ v3_ca ]
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer:always
+subjectAltName = @alt_names
+issuerAltName = issuer:copy
+
+[alt_names]
+DNS.1 = $DOCAPP_HOSTNAME
+EOF
+
+   openssl req -x509 -nodes -days 365 -new \
+      -keyout $host.key \
+      -out $host.crt \
+      -config ssl.conf -verbose
+
+fi
+
+
+
+echo -e "$colour_cyan
+ Issued HTTPS Certificate for $DOCAPP_HOSTNAME
+ 
+   * The following certificate files are installed in the directory
+   * $certs_dir
+"
+
+ls $DOCAPP_HOME/data/guacamole/certs -l | grep --color=never "crt\|key"
+
+echo -e "
+   * To reissue & replace them, run the following command
+
+   $DOCAPP_HOME/bin/config/nginx-https/install replace
+$colour_none"
+
+echo "* Nginx HTTPS is configured"
+

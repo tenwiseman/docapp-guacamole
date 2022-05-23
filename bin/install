@@ -1,0 +1,34 @@
+#!/bin/bash
+colour_red='\033[0;31m'
+colour_grn='\033[1;32m'
+colour_none='\033[0m' # No Colour
+
+echo "
+ DocApp installer
+ ================
+"
+
+./config/environment/install \
+   && source /root/.bash_aliases \
+   && ./config/guacamole-mysql/install \
+   && ./config/guacamole-tomcat/install \
+   && ./config/guacamole-auth/install \
+   && ./config/nginx-https/install 
+
+status=$?
+
+if [ $status -ne 0 ];then  
+   echo -e "$colour_red
+ ? This script unfortunately did not fully complete!
+
+ Please resolve issues shown and try again!
+$colour_none"
+
+else
+
+   echo -e "$colour_grn
+ ! This is a successful DocApp install!
+$colour_none"
+
+fi
+

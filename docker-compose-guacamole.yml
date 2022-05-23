@@ -1,0 +1,34 @@
+version: '3'
+
+services:
+  db:
+    image: mysql:8.0.29-debian
+    hostname: db
+    #restart: always
+    command: --default-authentication-plugin=caching_sha2_password
+    environment:
+      MYSQL_ROOT_PASSWORD: "veryhardrootpasswd"
+      MYSQL_DATABASE: "guacamole_db"
+    volumes:
+      - /opt/docapp/data/guacamole/mysql:/var/lib/mysql
+
+  guacd:
+    image: guacamole/guacd
+    hostname: guacd
+    environment:
+      GUACD_LOG_LEVEL: "debug"
+
+  guacamole:
+    image: guacamole/guacamole:1.4.0
+    user: root
+    environment:
+      MYSQL_HOSTNAME: "db"
+      MYSQL_DATABASE: "guacamole_db"
+      MYSQL_USER: "guacauser"
+      MYSQL_PASSWORD: "veryharduserpasswd"
+      GUACD_HOSTNAME: "guacd"
+      #GUACAMOLE_HOME: "/data"
+      VIRTUAL_HOST: "guacamole.custom-site.com"
+    volumes:
+      - /opt/docapp/data/guacamole/guaca-home:/root
+

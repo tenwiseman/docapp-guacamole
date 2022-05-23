@@ -1,0 +1,121 @@
+#!/bin/bash
+colour_cyan='\033[0;36m'
+colour_yelw='\033[1;33m'
+colour_none='\033[0m' # No Color
+
+dockerdb=docapp_db_1
+mysql_user=guacauser
+guacamole=guacamole/guacamole:1.4.0
+
+# IMPORTANT!
+#  change the following passwords from the defaults, they have
+#  to match the same variables used in docker-compose-guacamole.yml
+ 
+MYSQL_ROOT_PASSWORD=veryhardrootpasswd
+MYSQL_PASSWORD=veryharduserpasswd
+
+mysql_dir=$DOCAPP_HOME/data/guacamole/mysql
+scratch_dir=$DOCAPP_HOME/data/guacamole/scratch/mysql
+
+echo -e "$colour_yelw
+* Checking MySQL Installation
+$colour_none"
+
+if [ ! -d "$DOCAPP_HOME" ];then
+   echo "? docapp home ($DOCAPP_HOME) missing?"
+   exit 1 
+fi
+
+cd $DOCAPP_HOME
+
+if [ "$1" == "clean" ];then
+
+  if $(docker ps | grep -q "$dockerdb");then
+    echo "
+      ? The docker container $dockerdb is RUNNING!
+      Please stop it then run this command again"
+    exit 1
+  fi
+
+  if [ -d "$scratch_dir" ];then
+     cd $scratch_dir
+     rm -f initdb.sql inituser.sql 
+     rmdir ../mysql && echo "* Scratch files cleaned"
+  fi
+
+  echo "* $scratch_dir has been removed or was not created" 
+
+  if [ -d "$mysql_dir" ];then
+     cd $mysql_dir 
+     rm -r ../mysql/* && echo "* Database files cleaned"    
+  fi
+
+  echo "* $mysql_dir has been removed or was not created" 
+
+  exit
+fi
+
+if [ "$MYSQL_ROOT_PASSWORD" == "veryhardrootpasswd" ];then
+   echo "
+       ? For guacamole's security the following files need the default passwords changed
+
+       $DOCAPP_HOME/docker-compose-guacamole.yml
+       $DOCAPP_HOME/bin/config/guacamole-mysql/config-guacamole"
+
+   exit 1
+fi
+
+if ! $(docker ps | grep -q "$dockerdb");then
+   echo "? The docker container $dockerdb is NOT running!"
+   exit 1
+fi
+
+
+if [ -d "$scratch_dir" ];then
+   echo -e "$colour_cyan
+* The MySQL guacamole_db database has already been created
+$colour_none"
+
+else
+
+
+   read -p "## Hit <Enter> to configure the $dockerdb database. Or <Ctrl-C> to abort now! ##"
+
+   echo "* Configuring Database ..."
+
+
+   mkdir -p $scratch_dir
+   cd $scratch_dir
+
+
+cat << EOF > inituser.sql
+CREATE USER IF NOT EXISTS '$mysql_user'@'%' IDENTIFIED BY '$MYSQL_PASSWORD';
+GRANT SELECT,INSERT,UPDATE,DELETE ON guacamole_db.* TO '$mysql_user'@'%';
+FLUSH PRIVILEGES;
+select Host,User,Plugin,authentication_string from mysql.user;
+SHOW GRANTS FOR '$mysql_user'@'%';
+DROP DATABASE IF EXISTS guacamole_db;
+CREATE DATABASE guacamole_db;
+EOF
+
+
+echo -e "$colour_cyan"
+
+   # runs the above SQL 
+   docker exec -i $dockerdb mysql -u root --password=$MYSQL_ROOT_PASSWORD < inituser.sql 2>&1 | grep -v "Using a password" 
+echo -e "$colour_none"
+
+   # this command extracts a copy of initdb.sql from the container we can use
+   docker run --rm $guacamole /opt/guacamole/bin/initdb.sh --mysql > initdb.sql
+
+   # run the initdb.sql SQL
+   docker exec -i $dockerdb mysql -u root --password=$MYSQL_ROOT_PASSWORD guacamole_db < initdb.sql 2<&1 | grep -v "Using a password"
+
+   # cleanup
+   rm initdb.sql inituser.sql
+
+fi
+
+
+echo "* MySQL is configured."
+

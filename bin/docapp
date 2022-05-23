@@ -1,0 +1,73 @@
+#!/bin/bash
+
+DOCAPP_HOME=/opt/docapp
+
+
+function svhelp {
+  cat << EOF
+
+ --------------------------------------------
+ | DOCAPP : A docker application run script | 
+ |                                          |
+ |        Tenwiseman - January 2022         |
+ --------------------------------------------
+  
+ Usage: docapp COMMAND [APP]
+
+ where ...
+
+   COMMAND :
+     start   Start APP 
+     stop    Stop APP
+     show    Show running containers 
+     prune   prune nonrunning containers 
+
+   APP :
+     all     ALL below 
+     nginx    Nginx Proxy 
+     guaca    Guacamole
+
+EOF
+}
+
+first=$1
+shift
+second=$1
+
+case "$second" in
+
+  all)      echo "$first ALL containers"
+            composefiles="\
+-f $DOCAPP_HOME/docker-compose.yml \
+-f $DOCAPP_HOME/docker-compose-guacamole.yml"
+              ;;
+  nginx)    echo "$first nginx proxy"
+            composefiles="-f $DOCAPP_HOME/docker-compose.yml"
+            ;;
+  guaca)    echo "$first Guacamole application"
+            composefiles="-f $DOCAPP_HOME/docker-compose-guacamole.yml"
+              ;;
+esac
+
+
+case "$first" in
+
+start)    if [ ! -z "$composefiles" ];then
+            docker-compose $composefiles up -d
+	         #docker logs -t -f docapp_guacamole_1
+     fi
+          ;;
+stop)     if [ ! -z "$composefiles" ];then
+            docker-compose $composefiles down
+	  fi
+          ;;
+show)     docker ps
+          ;;
+prune)    docker container prune
+	  docker volume prune
+	  ;;
+*)        echo -e "\n ? COMMAND parameters expected!"
+	  svhelp
+esac
+
+

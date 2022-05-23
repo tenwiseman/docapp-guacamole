@@ -1,0 +1,38 @@
+#!/bin/bash
+colour_cyan='\033[0;36m'
+colour_yelw='\033[1;33m'
+colour_none='\033[0m' # No Colour
+
+DOCAPP_HOME=/opt/docapp
+
+# commands to add to .bash_aliases
+new_alias="alias docapp=$DOCAPP_HOME/bin/docapp"
+new_export="export DOCAPP_HOME=$DOCAPP_HOME"
+alias_file="/root/.bash_aliases"
+
+
+echo -e "$colour_yelw
+* Checking Shell Environment
+$colour_none"
+
+if [ ! "$1" == "clean" ];then 
+
+   if ! grep -sq "$new_alias" $alias_file ; then
+      echo "$new_alias" >> $alias_file 
+   fi
+
+   if ! grep -sq "$new_export" $alias_file ; then
+      echo "$new_export" >> $alias_file  
+   fi
+   
+   echo "* Environment is configured"
+
+else
+
+   sed -i "/alias docapp/d" $alias_file  
+   sed -i "/export DOCAPP_HOME/d" $alias_file  
+
+   echo "* Environment is clean"
+
+fi
+

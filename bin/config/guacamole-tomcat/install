@@ -1,0 +1,84 @@
+#!/bin/bash
+colour_cyan='\033[0;36m'
+colour_yelw='\033[1;33m'
+colour_none='\033[0m' # No Color
+
+docker_guacamole=docapp_guacamole_1
+
+#scratch_dir=./bin/config/guacamole-tomcat/scratch
+scratch_dir=./data/guacamole/scratch/tomcat
+xslt_dir=$DOCAPP_HOME/bin/config/guacamole-tomcat/xslt
+
+
+##############
+#
+# adding Tomcat RemoteIpValve setting
+#
+
+echo -e "$colour_yelw
+* Checking Apache Tomcat Installation
+$colour_none"
+
+
+if [ -z $(which xsltproc) ];then
+	apt-get -y install xsltproc
+fi
+
+if [ ! -d "$DOCAPP_HOME" ];then
+   echo "? docapp home ($DOCAPP_HOME) missing?"
+   echo "! stopping configuration"
+   exit 1 
+fi
+
+cd $DOCAPP_HOME
+
+if [ "$1" == "clean" ];then
+
+  if [ -d "$scratch_dir" ]; then
+    cd $scratch_dir
+    rm -f server.new server.xml
+    rmdir ../tomcat && echo "* cleaned scratch"
+  fi
+
+  echo "* $scratch_dir has been removed or was not created"
+
+  exit
+
+fi
+
+if ! $(docker ps | grep -q "$docker_guacamole");then
+   echo "? The docker container $docker_guacamole is NOT running!"
+   echo "! stopping configuration"
+   exit 1
+fi
+
+# reg expression matching docker network subnet
+internalProxies="10\.68\.5\.d{1,3}"
+
+TOMCAT_CONF=/usr/local/tomcat/conf
+
+if [ -z $(docker exec -it $docker_guacamole sh -c "test -e $TOMCAT_CONF/server.old && echo 'exists'") ];then
+
+   echo "! Updating Tomcat settings ..."
+
+   mkdir -p $scratch_dir
+   cd $scratch_dir
+
+   # fetch
+   docker cp $docker_guacamole:$TOMCAT_CONF/server.xml .
+
+   # edit
+   xsltproc --stringparam ProxyRegExp $internalProxies $xslt_dir/RemoteIpValve.xslt server.xml > server.new
+ 
+   # write 
+   docker cp server.new $docker_guacamole:$TOMCAT_CONF
+
+   # swap  
+   docker exec -it $docker_guacamole sh -c "cd $TOMCAT_CONF && mv server.xml server.old && mv server.new server.xml"
+
+fi
+
+echo "* Tomcat is configured."
+
+
+
